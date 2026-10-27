@@ -1,0 +1,168 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Duordle - Aagam vs Palak</title>
+<style>
+:root{--bg:#121213;--g:#538d4e;--y:#b59f3b;--x:#3a3a3c;--ln:#565758;--r:#c0504d}
+*{box-sizing:border-box;margin:0}
+[hidden]{display:none!important}
+body{background:var(--bg);color:#fff;font:16px system-ui,sans-serif;min-height:100dvh;display:flex;justify-content:center;padding:8px 8px calc(8px + env(safe-area-inset-bottom))}
+#app{width:100%;max-width:480px;display:flex;flex-direction:column}
+#game{display:flex;flex-direction:column;align-items:center;gap:8px;flex:1}
+#pick{display:flex;flex-direction:column;gap:16px;align-items:center;margin-top:20vh;text-align:center}
+header{width:100%;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid var(--x);padding-bottom:6px}
+h1{font-size:22px;letter-spacing:3px}
+.sm{font-size:13px;opacity:.75;text-align:center;min-height:16px}
+a{color:#9ab}
+#dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:#888;margin-right:6px}
+#dot.on{background:var(--g)}
+.btn{background:var(--g);color:#fff;border:0;border-radius:8px;padding:14px 28px;font-size:18px;font-weight:700;cursor:pointer}
+.sc{display:flex;gap:10px;width:100%}
+.sc div{flex:1;text-align:center;background:#1e1e1f;border-radius:8px;padding:6px}
+.sc .me{outline:2px solid var(--g)}
+.sc b{font-size:26px;display:block}
+.sc small{opacity:.7;font-size:12px;display:block}
+.pips{display:flex;gap:8px}
+.pips i{width:24px;height:24px;border-radius:50%;border:2px solid var(--x);font:700 12px/20px system-ui;text-align:center}
+.pips .w{background:var(--g);border-color:var(--g)}
+.pips .l{background:var(--r);border-color:var(--r)}
+.pips .d{background:#666;border-color:#666}
+.pips .c{border-color:#fff}
+#rl{font-weight:700}
+#grid{display:grid;gap:5px}
+.row{display:flex;gap:5px;justify-content:center}
+.t{width:min(14vw,58px);aspect-ratio:1;display:grid;place-items:center;border:2px solid var(--x);font:700 28px system-ui}
+.t.f{border-color:var(--ln)}
+.t.g{background:var(--g);border-color:var(--g)}
+.t.y{background:var(--y);border-color:var(--y)}
+.t.x{background:var(--x);border-color:var(--x)}
+.flip{animation:flip .55s ease both}
+@keyframes flip{0%{transform:rotateX(0);background:none;border-color:var(--ln)}49%{background:none;border-color:var(--ln)}50%{transform:rotateX(90deg)}100%{transform:rotateX(0)}}
+.shake{animation:sh .4s}
+@keyframes sh{25%{transform:translateX(-6px)}75%{transform:translateX(6px)}}
+#kb{width:100%;display:flex;flex-direction:column;gap:6px;margin-top:auto}
+.kr{display:flex;gap:5px;justify-content:center}
+#kb button{flex:1;max-width:44px;height:54px;border:0;border-radius:5px;background:#818384;color:#fff;font:700 14px system-ui;cursor:pointer;touch-action:manipulation}
+#kb .w{max-width:66px;flex:1.5}
+#kb .g{background:var(--g)}#kb .y{background:var(--y)}#kb .x{background:var(--x)}
+#toast{position:fixed;top:70px;left:50%;transform:translateX(-50%);background:#fff;color:#000;padding:10px 14px;border-radius:6px;font-weight:700;opacity:0;transition:opacity .2s;pointer-events:none}
+</style>
+</head>
+<body>
+<div id="app">
+ <div id="pick" hidden>
+  <h2>Who is playing on this device?</h2>
+  <button class="btn" data-p="A">I am Aagam</button>
+  <button class="btn" data-p="P">I am Palak</button>
+  <p class="sm">Pick once per device. You only ever see your own guesses.</p>
+ </div>
+ <div id="game" hidden>
+  <header><h1>DUORDLE</h1><span class="sm"><i id="dot"></i><span id="who"></span> &middot; <a id="sw" href="#">switch</a></span></header>
+  <div class="sc" id="sc"></div>
+  <div class="pips" id="pips"></div>
+  <div class="sm" id="msg"></div>
+  <div id="rl"></div>
+  <div id="grid"></div>
+  <div class="sm" id="opp"></div>
+  <div class="sm" id="wait"></div>
+  <div id="kb"></div>
+ </div>
+</div>
+<div id="toast"></div>
+<script>
+// ---- Settings: change ROOM to anything unique (letters, digits, dashes). Both devices must match. ----
+const ROOM='aagam-palak-duordle',RELAY='https://ntfy.sh/',NAME={A:'Aagam',P:'Palak'};
+const DICTS=['https://raw.githubusercontent.com/tabatkins/wordle-list/main/words','https://raw.githubusercontent.com/charlesreid1/five-letter-words/master/sgb-words.txt'];
+const RAW=`about above actor adapt admit adopt adult after again agent agree ahead alarm album alert alike alive allow alone along alter among angel anger angle angry apart apple apply arena argue arise armor aside asset audio avoid award aware basic beach began begin being bench birth black blade blame blank blast blend blind block blood bloom board boost bound brain brand brave bread break brick bride brief bring broad brown brush build bunch burst cabin cable candy carry catch cause chain chair chalk charm chart chase cheap check cheek cheer chess chest chief child chill choir civil claim class clean clear clerk click cliff climb clock close cloth cloud coach coast coral couch could count court cover crack craft crane crash crazy cream crime cross crowd crown crush curve cycle daily dance dealt death delay depth dirty doubt dozen draft drain drama dream dress drift drink drive eager early earth eight elbow elite empty enemy enjoy enter equal error essay event every exact extra faith false fancy fault feast fence fever field fifth fifty fight final first flame flash fleet float flood floor flour focus force forth forty frame fresh front frost fruit funny ghost giant given glass globe glory glove grace grade grain grand grant grape graph grasp grass great green greet grief group guard guess guest guide habit happy harsh heart heavy hello honey honor horse hotel house human humor ideal image index inner input issue ivory jelly jewel joint judge juice knife knock known label labor large laser later laugh layer learn least leave legal lemon level light limit linen liver lobby local logic loose lover lower loyal lucky lunch magic major maker march match maybe mayor media mercy merit metal meter might minor mixed model money month moral motor mount mouse mouth movie music nerve never night noble noise north novel nurse ocean offer often olive onion opera orbit order other outer owner paint panel paper party pasta patch pause peace pearl phase phone photo piano piece pilot pitch pizza place plain plane plant plate point polar pound power press price pride prime print prize proof proud prove pulse punch pupil queen quest quick quiet quote radio raise range rapid ratio reach react ready realm rebel relax reply ridge right rigid river roast robot rough round route royal rural salad sauce scale scene scope score scout sense serve seven shade shake shame shape share sharp sheep sheet shelf shell shift shine shirt shock shoot shore short shout sight silly since skill skirt sleep slice slide small smart smell smile smoke snake solid solve sorry sound south space spare speak speed spell spend spice spine split spoke sport spray squad stack staff stage stair stake stamp stand stare start state steam steel steep stick stiff still stock stone store storm story stove study stuff style sugar suite sunny super sweet swift swing sword table taste teach thank theme thick thing think third three throw thumb tiger tight tired title toast today token tooth topic total touch tough towel tower trace track trade trail train trait treat trend trial tribe trick truck truly trunk trust truth twice twist uncle under union unity until upper urban usual valid value video virus visit vital vivid voice wagon waste watch water weary weigh weird whale wheat wheel where which while white whole woman world worry worse worth would wound write wrong yield young youth zebra`;
+const ANS=[...new Set(RAW.split(/\s+/))].filter(w=>/^[a-z]{5}$/.test(w));
+const $=s=>document.querySelector(s),ls=localStorage,pad=n=>String(n).padStart(2,'0');
+
+// ---- Daily words: same 7 words on every device for a given date, new ones each day ----
+const now=new Date(),Y=now.getFullYear(),M=now.getMonth(),D=now.getDate();
+const DAY=''+Y+pad(M+1)+pad(D),TOPIC=ROOM+'-'+DAY,dn=Math.round(Date.UTC(Y,M,D)/864e5);
+function rng(a){return()=>{a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd=rng(2026),deck=[...ANS];
+for(let i=deck.length-1;i>0;i--){const j=Math.floor(rnd()*(i+1));[deck[i],deck[j]]=[deck[j],deck[i]]}
+const WORDS=[...Array(7)].map((_,i)=>deck[(dn*7+i)%deck.length].toUpperCase());
+
+// ---- State ----
+let me=ls.dw_me||'',ev=[],seen=new Set(),dict=null,cur='',anim=-1,lastR=-1,tt;
+const BK=()=>`dw_b_${me}_${DAY}`,HK='dw_h_'+ROOM;
+let boards=me?JSON.parse(ls[BK()]||'{}'):{};
+const save=()=>ls[BK()]=JSON.stringify(boards);
+const opp=()=>me==='A'?'P':'A';
+const outcome=r=>{const e=ev.filter(x=>x.r===r),s=e.find(x=>x.k==='s');if(s)return s.p;return['A','P'].every(p=>e.some(x=>x.p===p&&x.k==='f'))?'D':null};
+const cr=()=>{for(let r=0;r<7;r++)if(!outcome(r))return r;return 7};
+const solved=r=>(boards[r]||[]).includes(WORDS[r]);
+const done=r=>solved(r)||(boards[r]||[]).length>=6;
+const canType=()=>{const r=cr();return !!me&&r<7&&!done(r)};
+const ok=w=>ANS.includes(w.toLowerCase())||!dict||dict.has(w.toLowerCase());
+function score(g,w){const o=Array(5).fill('x'),c={};for(let i=0;i<5;i++){if(g[i]===w[i])o[i]='g';else c[w[i]]=(c[w[i]]||0)+1}for(let i=0;i<5;i++){if(o[i]!=='g'&&c[g[i]]>0){o[i]='y';c[g[i]]--}}return o}
+
+// ---- Optional: load full Wordle dictionary to reject non-words (falls back to accepting any 5 letters) ----
+(async()=>{for(const u of DICTS){try{const t=(await(await fetch(u)).text()).toLowerCase();const s=new Set(t.split(/\s+/).filter(w=>/^[a-z]{5}$/.test(w)));if(s.size>1000){dict=s;return}}catch(_){}}})();
+
+// ---- Realtime sync (free ntfy.sh relay; only guess COUNTS and solve/fail events are shared, never letters) ----
+function send(o){fetch(RELAY+TOPIC,{method:'POST',body:JSON.stringify(o)}).then(r=>r.ok||Promise.reject()).catch(()=>setTimeout(()=>send(o),3000))}
+function resync(){if(!me)return;for(const r in boards){const b=boards[r],n=b.length;if(!n)continue;if(!seen.has(''+me+r+n))send({p:me,r:+r,n,k:b.includes(WORDS[r])?'s':n>=6?'f':'g'})}}
+function lock(){const h=JSON.parse(ls[HK]||'{}'),d=h[DAY]||[];for(let r=0;r<7;r++){const o=outcome(r);if(o)d[r]=o}h[DAY]=d;ls[HK]=JSON.stringify(h)}
+function connect(){
+ const es=new EventSource(`${RELAY}${TOPIC}/sse?since=all`);
+ es.onopen=()=>{$('#dot').className='on';setTimeout(resync,2500)};
+ es.onerror=()=>{$('#dot').className=''};
+ es.onmessage=m=>{try{const d=JSON.parse(m.data);if(d.event!=='message')return;const e=JSON.parse(d.message),k=''+e.p+e.r+e.n;if(seen.has(k))return;seen.add(k);ev.push(e);lock();render()}catch(_){}};
+}
+
+// ---- Input ----
+function toast(m){const t=$('#toast');t.textContent=m;t.style.opacity=1;clearTimeout(tt);tt=setTimeout(()=>t.style.opacity=0,1500)}
+function shake(){const e=$('.row.cur');if(e){e.classList.remove('shake');void e.offsetWidth;e.classList.add('shake')}}
+const add=c=>{if(canType()&&cur.length<5){cur+=c;render()}};
+const del=()=>{if(canType()){cur=cur.slice(0,-1);render()}};
+function submit(){
+ if(!canType())return;
+ if(cur.length<5){shake();return toast('Not enough letters')}
+ if(!ok(cur)){shake();return toast('Not in word list')}
+ const r=cr(),b=boards[r]=boards[r]||[];
+ b.push(cur);save();
+ send({p:me,r,n:b.length,k:cur===WORDS[r]?'s':b.length>=6?'f':'g'});
+ cur='';anim=b.length-1;setTimeout(()=>{anim=-1;render()},1600);render();
+}
+addEventListener('keydown',e=>{if(!me||e.ctrlKey||e.metaKey||e.altKey)return;if(e.key==='Enter')submit();else if(e.key==='Backspace')del();else if(/^[a-z]$/i.test(e.key))add(e.key.toUpperCase())});
+$('#kb').innerHTML=['QWERTYUIOP','ASDFGHJKL','ZXCVBNM'].map((row,i)=>`<div class="kr">${i==2?'<button data-k="Enter" class="w">ENTER</button>':''}${[...row].map(c=>`<button data-k="${c}">${c}</button>`).join('')}${i==2?'<button data-k="Back" class="w">&#9003;</button>':''}</div>`).join('');
+$('#kb').onpointerdown=e=>{const k=e.target.closest('button')?.dataset.k;if(!k)return;e.preventDefault();k==='Enter'?submit():k==='Back'?del():add(k)};
+document.querySelectorAll('#pick .btn').forEach(b=>b.onclick=()=>{me=b.dataset.p;ls.dw_me=me;boards=JSON.parse(ls[BK()]||'{}');cur='';lastR=-1;render();resync()});
+$('#sw').onclick=e=>{e.preventDefault();me='';ls.removeItem('dw_me');render()};
+
+// ---- Render ----
+function render(){
+ $('#pick').hidden=!!me;$('#game').hidden=!me;if(!me)return;
+ const r=cr(),o=opp(),b=boards[r]||[],w=WORDS[r]||'',open=r<7&&!done(r);
+ if(r!==lastR){cur='';lastR=r}
+ const h=JSON.parse(ls[HK]||'{}'),n=(a,p)=>a.filter(x=>x===p).length;
+ const td=[...Array(7)].map((_,i)=>outcome(i)||(h[DAY]||[])[i]);
+ const all=Object.entries(h).filter(e=>e[0]!==DAY).flatMap(e=>e[1]).concat(td);
+ $('#who').textContent=NAME[me];
+ $('#sc').innerHTML=['A','P'].map(p=>`<div class="${p===me?'me':''}"><small>${NAME[p]}${p===me?' (you)':''} today</small><b>${n(td,p)}</b><small>all-time ${n(all,p)}</small></div>`).join('');
+ $('#pips').innerHTML=td.map((x,i)=>`<i class="${x===me?'w':x===o?'l':x==='D'?'d':i===r?'c':''}">${i+1}</i>`).join('');
+ const lr=r-1,x=lr>=0?outcome(lr):null,a=n(td,'A'),p=n(td,'P');
+ $('#msg').textContent=r>6?`Day complete! ${a===p?'Tie game':NAME[a>p?'A':'P']+' wins today'} (${a}-${p}). New words tomorrow.`:lr<0?'First to solve each word wins the round':`Round ${lr+1}: ${x==='D'?'nobody got it':NAME[x]+' got it first'}. The word was ${WORDS[lr]}`;
+ $('#rl').textContent=r>6?'':`Round ${r+1} of 7`;
+ const oe=ev.filter(e=>e.p===o&&e.r===r).pop();
+ $('#opp').textContent=r>6?'':!oe?`${NAME[o]} has not guessed yet`:oe.k==='f'?`${NAME[o]} is out of guesses`:`${NAME[o]} is on guess ${oe.n} of 6`;
+ $('#wait').textContent=r<7&&done(r)?(solved(r)?'You got it! Confirming your win...':`Out of guesses. Waiting for ${NAME[o]}...`):'';
+ $('#grid').hidden=$('#kb').hidden=r>6;
+ const ks={},rank={g:3,y:2,x:1};let g='';
+ for(let i=0;i<6;i++){
+  const isCur=open&&i===b.length,s=b[i]||(isCur?cur:''),sc=b[i]?score(b[i],w):null;
+  if(sc)[...b[i]].forEach((c,j)=>{if(!ks[c]||rank[sc[j]]>rank[ks[c]])ks[c]=sc[j]});
+  g+=`<div class="row${isCur?' cur':''}">`+[0,1,2,3,4].map(j=>`<span class="t ${s[j]?'f ':''}${sc?sc[j]+(i===anim?' flip':''):''}" style="animation-delay:${j*.2}s">${s[j]||''}</span>`).join('')+'</div>';
+ }
+ $('#grid').innerHTML=g;
+ document.querySelectorAll('#kb button').forEach(k=>{k.className=(k.dataset.k.length>1?'w ':'')+(ks[k.dataset.k]||'')});
+}
+render();connect();
+</script>
+</body>
+</html>
